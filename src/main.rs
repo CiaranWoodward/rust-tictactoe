@@ -1,3 +1,5 @@
+use std::io;
+
 #[derive(Copy, Clone, PartialEq)]
 enum TTTCell {
     Empty,
@@ -22,9 +24,15 @@ impl TTTGrid {
         self.grid[index]
     }
 
-    fn set_cell(&mut self, x: u8, y: u8, state: TTTCell) {
+    fn set_cell(&mut self, x: u8, y: u8, state: TTTCell) -> Result<(), ()> {
         let index: usize = ((y * 3) + x) as usize;
-        self.grid[index] = state;
+
+        if self.get_cell(x, y) != TTTCell::Empty {
+            Result::Err(())
+        } else {
+            self.grid[index] = state;
+            Result::Ok(())
+        }
     }
 
     fn check_winner(&self) -> TTTCell {
@@ -92,6 +100,51 @@ impl std::fmt::Display for TTTGrid {
 }
 
 fn main() {
-    let grid = TTTGrid::new();
-    println!("{}", grid);
+    let mut grid = TTTGrid::new();
+
+    let mut cur_turn = TTTCell::Cross;
+    while cur_turn != TTTCell::Empty {
+        println!("{}", grid);
+
+        let winner = grid.check_winner();
+        if winner != TTTCell::Empty {
+            println!("Winner! The winner is {}", winner);
+            break;
+        }
+
+        let mut x = String::new();
+        let mut y = String::new();
+
+        println!("It's {}'s turn! Type x coord: ", cur_turn);
+        io::stdin().read_line(&mut x).expect("Failed to read line");
+        println!("Type y coord: ");
+        io::stdin().read_line(&mut y).expect("Failed to read line");
+
+        let x = x.trim().parse::<u8>();
+        let y = y.trim().parse::<u8>();
+
+        if x.is_err() || y.is_err() {
+            println!("Coordinates must be integers in range 0-2");
+            continue;
+        }
+
+        let x = x.unwrap();
+        let y = y.unwrap();
+
+        if x > 2 || y > 2 {
+            println!("Coordinates must be integers in range 0-2");
+            continue;
+        }
+
+        if grid.set_cell(x, y, cur_turn).is_err() {
+            println!("Invalid cell selected!");
+            continue;
+        }
+
+        cur_turn = match cur_turn {
+            TTTCell::Cross => TTTCell::Nought,
+            TTTCell::Nought => TTTCell::Cross,
+            TTTCell::Empty => TTTCell::Empty,
+        }
+    }
 }
