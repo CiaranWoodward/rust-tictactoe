@@ -1,33 +1,45 @@
 use std::io;
 
+const SIDE_LENGTH: usize = 4;
+
 #[derive(Copy, Clone, PartialEq)]
 enum TTTCell {
+    Invalid,
     Empty,
     Nought,
     Cross,
 }
 
 struct TTTGrid {
-    grid: [TTTCell; 9],
+    grid: [TTTCell; SIDE_LENGTH * SIDE_LENGTH],
+}
+
+impl TTTCell {
+    fn is_player(&self) -> bool {
+        match self {
+            TTTCell::Cross => true,
+            TTTCell::Nought => true,
+            _ => false,
+        }
+    }
 }
 
 impl TTTGrid {
     fn new() -> TTTGrid {
         TTTGrid {
-            grid: [TTTCell::Empty; 9],
+            grid: [TTTCell::Empty; SIDE_LENGTH * SIDE_LENGTH],
         }
     }
 
-    fn get_cell(&self, x: u8, y: u8) -> TTTCell {
-        let index: usize = ((y * 3) + x) as usize;
+    fn get_cell(&self, x: usize, y: usize) -> Option<&TTTCell> {
+        let index: usize = (y * SIDE_LENGTH) + x;
 
-        self.grid[index]
+        self.grid.get(index)
     }
 
-    fn set_cell(&mut self, x: u8, y: u8, state: TTTCell) -> Result<(), ()> {
-        let index: usize = ((y * 3) + x) as usize;
-
-        if self.get_cell(x, y) != TTTCell::Empty {
+    fn set_cell(&mut self, x: usize, y: usize, state: TTTCell) -> Result<(), ()> {
+        let index: usize = (y * SIDE_LENGTH) + x;
+        if self.get_cell(x, y).unwrap_or(&TTTCell::Invalid) != &TTTCell::Empty {
             Result::Err(())
         } else {
             self.grid[index] = state;
@@ -36,42 +48,74 @@ impl TTTGrid {
     }
 
     fn check_winner(&self) -> TTTCell {
-        // horiz wins
-        for i in 0..2 {
-            let index: usize = (i * 3) as usize;
+        //Check rows
+        for row in 0..SIDE_LENGTH {
+            let contender = self.get_cell(0, row).unwrap();
+            let mut is_won = true;
 
-            if self.grid[index] != TTTCell::Empty
-                && self.grid[index] == self.grid[index + 1]
-                && self.grid[index] == self.grid[index + 2]
-            {
-                return self.grid[index];
+            if !contender.is_player() {
+                continue;
+            }
+
+            for col in 1..SIDE_LENGTH {
+                if self.get_cell(col, row).unwrap() != contender {
+                    is_won = false;
+                    break;
+                }
+            }
+            if is_won {
+                return *contender;
             }
         }
 
-        // vert wins
-        for i in 0..2 {
-            let index: usize = i as usize;
+        //Check columns
+        for col in 0..SIDE_LENGTH {
+            let contender = self.get_cell(col, 0).unwrap();
+            let mut is_won = true;
 
-            if self.grid[index] != TTTCell::Empty
-                && self.grid[index] == self.grid[index + 3]
-                && self.grid[index] == self.grid[index + 6]
-            {
-                return self.grid[index];
+            if !contender.is_player() {
+                continue;
+            }
+
+            for row in 1..SIDE_LENGTH {
+                if self.get_cell(col, row).unwrap() != contender {
+                    is_won = false;
+                    break;
+                }
+            }
+            if is_won {
+                return *contender;
             }
         }
 
-        // Diagonals
-        if self.grid[0] != TTTCell::Empty
-            && self.grid[0] == self.grid[4]
-            && self.grid[0] == self.grid[8]
-        {
-            return self.grid[0];
+        // Diagonal pos
+        let contender = self.get_cell(0, 0).unwrap();
+        if contender.is_player() {
+            let mut is_won = true;
+            for i in 1..SIDE_LENGTH {
+                if self.get_cell(i, i).unwrap() != contender {
+                    is_won = false;
+                    break;
+                }
+            }
+            if is_won {
+                return *contender;
+            }
         }
-        if self.grid[2] != TTTCell::Empty
-            && self.grid[2] == self.grid[4]
-            && self.grid[2] == self.grid[6]
-        {
-            return self.grid[0];
+
+        //Diagonal neg
+        let contender = self.get_cell(SIDE_LENGTH-1, 0).unwrap();
+        if contender.is_player() {
+            let mut is_won = true;
+            for i in 1..SIDE_LENGTH {
+                if self.get_cell(SIDE_LENGTH - (i + 1), i).unwrap() != contender {
+                    is_won = false;
+                    break;
+                }
+            }
+            if is_won {
+                return *contender;
+            }
         }
 
         TTTCell::Empty
@@ -81,21 +125,31 @@ impl TTTGrid {
 impl std::fmt::Display for TTTCell {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            TTTCell::Empty => write!(f, " "),
             TTTCell::Cross => write!(f, "X"),
             TTTCell::Nought => write!(f, "O"),
+            _ => write!(f, " "),
         }
     }
 }
 
 impl std::fmt::Display for TTTGrid {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let &grid = &self.grid;
-        write!(
-            f,
-            " .0.1.2.\n0.{}.{}.{}.\n1.{}.{}.{}.\n2.{}.{}.{}.\n",
-            grid[0], grid[1], grid[2], grid[3], grid[4], grid[5], grid[6], grid[7], grid[8]
-        )
+        //Header
+        write!(f, " .")?;
+        for i in 0..SIDE_LENGTH {
+            write!(f, "{}.", i)?;
+        }
+        writeln!(f, "")?;
+
+        //Row by row
+        for row in 0..SIDE_LENGTH {
+            write!(f, "{}.", row)?;
+            for col in 0..SIDE_LENGTH {
+                write!(f, "{}.", self.get_cell(col, row).unwrap())?;
+            }
+            writeln!(f, "")?;
+        }
+        Ok(())
     }
 }
 
@@ -120,21 +174,16 @@ fn main() {
         println!("Type y coord: ");
         io::stdin().read_line(&mut y).expect("Failed to read line");
 
-        let x = x.trim().parse::<u8>();
-        let y = y.trim().parse::<u8>();
+        let x = x.trim().parse::<usize>();
+        let y = y.trim().parse::<usize>();
 
         if x.is_err() || y.is_err() {
-            println!("Coordinates must be integers in range 0-2");
+            println!("Coordinates must be integers in range 0-{}", SIDE_LENGTH);
             continue;
         }
 
         let x = x.unwrap();
         let y = y.unwrap();
-
-        if x > 2 || y > 2 {
-            println!("Coordinates must be integers in range 0-2");
-            continue;
-        }
 
         if grid.set_cell(x, y, cur_turn).is_err() {
             println!("Invalid cell selected!");
@@ -144,7 +193,7 @@ fn main() {
         cur_turn = match cur_turn {
             TTTCell::Cross => TTTCell::Nought,
             TTTCell::Nought => TTTCell::Cross,
-            TTTCell::Empty => TTTCell::Empty,
+            _ => TTTCell::Empty,
         }
     }
 }
