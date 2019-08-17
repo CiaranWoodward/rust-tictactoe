@@ -1,6 +1,5 @@
+use std::env;
 use std::io;
-
-const SIDE_LENGTH: usize = 4;
 
 #[derive(Copy, Clone, PartialEq)]
 enum TTTCell {
@@ -11,7 +10,8 @@ enum TTTCell {
 }
 
 struct TTTGrid {
-    grid: [TTTCell; SIDE_LENGTH * SIDE_LENGTH],
+    grid: Vec<TTTCell>,
+    side_length: usize,
 }
 
 impl TTTCell {
@@ -25,20 +25,21 @@ impl TTTCell {
 }
 
 impl TTTGrid {
-    fn new() -> TTTGrid {
+    fn new(side_length: usize) -> TTTGrid {
         TTTGrid {
-            grid: [TTTCell::Empty; SIDE_LENGTH * SIDE_LENGTH],
+            grid: vec![TTTCell::Empty; side_length * side_length],
+            side_length,
         }
     }
 
     fn get_cell(&self, x: usize, y: usize) -> Option<&TTTCell> {
-        let index: usize = (y * SIDE_LENGTH) + x;
+        let index: usize = (y * self.side_length) + x;
 
         self.grid.get(index)
     }
 
     fn set_cell(&mut self, x: usize, y: usize, state: TTTCell) -> Result<(), ()> {
-        let index: usize = (y * SIDE_LENGTH) + x;
+        let index: usize = (y * self.side_length) + x;
         if self.get_cell(x, y).unwrap_or(&TTTCell::Invalid) != &TTTCell::Empty {
             Result::Err(())
         } else {
@@ -49,7 +50,7 @@ impl TTTGrid {
 
     fn check_winner(&self) -> TTTCell {
         //Check rows
-        for row in 0..SIDE_LENGTH {
+        for row in 0..self.side_length {
             let contender = self.get_cell(0, row).unwrap();
             let mut is_won = true;
 
@@ -57,7 +58,7 @@ impl TTTGrid {
                 continue;
             }
 
-            for col in 1..SIDE_LENGTH {
+            for col in 1..self.side_length {
                 if self.get_cell(col, row).unwrap() != contender {
                     is_won = false;
                     break;
@@ -69,7 +70,7 @@ impl TTTGrid {
         }
 
         //Check columns
-        for col in 0..SIDE_LENGTH {
+        for col in 0..self.side_length {
             let contender = self.get_cell(col, 0).unwrap();
             let mut is_won = true;
 
@@ -77,7 +78,7 @@ impl TTTGrid {
                 continue;
             }
 
-            for row in 1..SIDE_LENGTH {
+            for row in 1..self.side_length {
                 if self.get_cell(col, row).unwrap() != contender {
                     is_won = false;
                     break;
@@ -92,7 +93,7 @@ impl TTTGrid {
         let contender = self.get_cell(0, 0).unwrap();
         if contender.is_player() {
             let mut is_won = true;
-            for i in 1..SIDE_LENGTH {
+            for i in 1..self.side_length {
                 if self.get_cell(i, i).unwrap() != contender {
                     is_won = false;
                     break;
@@ -104,11 +105,11 @@ impl TTTGrid {
         }
 
         //Diagonal neg
-        let contender = self.get_cell(SIDE_LENGTH-1, 0).unwrap();
+        let contender = self.get_cell(self.side_length - 1, 0).unwrap();
         if contender.is_player() {
             let mut is_won = true;
-            for i in 1..SIDE_LENGTH {
-                if self.get_cell(SIDE_LENGTH - (i + 1), i).unwrap() != contender {
+            for i in 1..self.side_length {
+                if self.get_cell(self.side_length - (i + 1), i).unwrap() != contender {
                     is_won = false;
                     break;
                 }
@@ -136,15 +137,15 @@ impl std::fmt::Display for TTTGrid {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         //Header
         write!(f, " .")?;
-        for i in 0..SIDE_LENGTH {
+        for i in 0..self.side_length {
             write!(f, "{}.", i)?;
         }
         writeln!(f, "")?;
 
         //Row by row
-        for row in 0..SIDE_LENGTH {
+        for row in 0..self.side_length {
             write!(f, "{}.", row)?;
-            for col in 0..SIDE_LENGTH {
+            for col in 0..self.side_length {
                 write!(f, "{}.", self.get_cell(col, row).unwrap())?;
             }
             writeln!(f, "")?;
@@ -154,7 +155,16 @@ impl std::fmt::Display for TTTGrid {
 }
 
 fn main() {
-    let mut grid = TTTGrid::new();
+    let args: Vec<String> = env::args().collect();
+    let side_length = args.get(1);
+
+    let side_length = if side_length.is_some() {
+        side_length.unwrap().trim().parse::<usize>().unwrap_or(3)
+    } else {
+        3
+    };
+
+    let mut grid = TTTGrid::new(side_length);
 
     let mut cur_turn = TTTCell::Cross;
     while cur_turn != TTTCell::Empty {
@@ -178,7 +188,10 @@ fn main() {
         let y = y.trim().parse::<usize>();
 
         if x.is_err() || y.is_err() {
-            println!("Coordinates must be integers in range 0-{}", SIDE_LENGTH);
+            println!(
+                "Coordinates must be integers in range 0-{}",
+                grid.side_length
+            );
             continue;
         }
 
